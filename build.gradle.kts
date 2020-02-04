@@ -1,5 +1,3 @@
-import groovy.util.Node
-
 /*
  * Copyright (C) 2019 Knot.x Project
  *
@@ -15,24 +13,78 @@ import groovy.util.Node
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import groovy.util.Node
 
 plugins {
     `kotlin-dsl`
     `maven-publish`
     signing
-    id("org.nosphere.apache.rat") version "0.4.0"
+    id("org.jetbrains.kotlin.jvm")
+    id("java-gradle-plugin")
+    id("com.gradle.plugin-publish")
+    id("org.nosphere.apache.rat")
 }
 
-tasks.rat {
-    excludes.addAll(
-            "README.md", "CODE_OF_CONDUCT.md",
-            ".gradletasknamecache", "gradle/wrapper/**", "gradlew*", "build/**", // Gradle
-            ".nb-gradle/**", "*.iml", "*.ipr", "*.iws", "*.idea/**", // IDEs
-            ".travis.yml" // Tools
-    )
+repositories {
+    jcenter()
+    maven { url = uri("https://plugins.gradle.org/m2/") }
 }
 
-tasks.check { dependsOn(tasks.rat) }
+dependencies {
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.3.61"))
+
+    implementation(gradleApi())
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.5.2")
+    testCompile(gradleTestKit())
+}
+
+val functionalTestSourceSet = sourceSets.create("functionalTest") {}
+gradlePlugin.testSourceSets(functionalTestSourceSet)
+configurations.getByName("functionalTestImplementation").extendsFrom(configurations.getByName("testImplementation"))
+
+tasks {
+    named<Javadoc>("javadoc") {
+        if (JavaVersion.current().isJava9Compatible) {
+            (options as StandardJavadocDocletOptions).addBooleanOption("html5", true)
+        }
+    }
+
+    withType<Test>().configureEach {
+        testLogging.showStandardStreams = true
+        useJUnitPlatform()
+    }
+
+    register<Test>("functionalTest") {
+        group = "verification"
+        testClassesDirs = functionalTestSourceSet.output.classesDirs
+        classpath = functionalTestSourceSet.runtimeClasspath
+
+        useJUnitPlatform()
+        mustRunAfter("test")
+        dependsOn("jar")
+        outputs.upToDateWhen { false }
+    }
+
+    named<Task>("build") {
+        dependsOn("functionalTest")
+    }
+
+    val ratTask = named<org.nosphere.apache.rat.RatTask>("rat") {
+        excludes.addAll(
+                "*.md", // docs
+                ".gradletasknamecache", "gradle/wrapper/**", "gradlew*", "**/build/**", // Gradle
+                "src/test/resources/**", "src/functionalTest/resources/**", // tests resources
+                ".nb-gradle/**", "*.iml", "*.ipr", "*.iws", "*.idea/**", // IDEs
+                ".travis.yml" // Tools
+        )
+    }
+
+    named("check") {
+        dependsOn(ratTask)
+    }
+}
 
 val sourcesJar by tasks.registering(Jar::class) {
     classifier = "sources"
@@ -42,11 +94,6 @@ val sourcesJar by tasks.registering(Jar::class) {
 val javadocJar by tasks.registering(Jar::class) {
     classifier = "javadoc"
     from(tasks.named<Javadoc>("javadoc"))
-}
-tasks.named<Javadoc>("javadoc") {
-    if (JavaVersion.current().isJava9Compatible) {
-        (options as StandardJavadocDocletOptions).addBooleanOption("html5", true)
-    }
 }
 
 fun configure(publication: MavenPublication) {
@@ -159,7 +206,20 @@ signing {
     sign(publishing.publications)
 }
 
-repositories {
-    jcenter()
-    maven { url = uri("https://plugins.gradle.org/m2/") }
+gradlePlugin {
+    plugins {
+        create("io.knotx.release-base") {
+            id = "io.knotx.release-base"
+            implementationClass = "io.knotx.release.KnotxReleaseBasePlugin"
+        }
+        create("io.knotx.release-java") {
+            id = "io.knotx.release-java"
+            implementationClass = "io.knotx.release.KnotxReleaseJavaPlugin"
+        }
+        create("io.knotx.release-docker") {
+            id = "io.knotx.release-docker"
+            implementationClass = "io.knotx.release.KnotxReleaseDockerPlugin"
+        }
+    }
 }
+
