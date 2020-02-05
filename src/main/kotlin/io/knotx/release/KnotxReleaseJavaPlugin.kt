@@ -23,29 +23,50 @@ class KnotxReleaseJavaPlugin : Plugin<Project> {
 
     override fun apply(project: Project) {
         with(project) {
-            plugins.apply("maven-publish")
             plugins.apply("io.knotx.release-base")
 
             tasks {
-                named("signMavenJavaPublication") {
+                register("signAllMavenArtifacts") {
+                    projectsToRelease().forEach {
+                        dependsOn("${it.fixedPath()}:signMavenJavaPublication")
+                    }
                     dependsOn("setVersion")
                 }
                 named("updateChangelog") {
-                    dependsOn("signMavenJavaPublication")
+                    dependsOn("signAllMavenArtifacts")
                 }
-
                 register("prepare") {
                     group = "release"
-                    dependsOn("updateChangelog", "publishToMavenLocal")
+                    projectsToRelease().forEach {
+                        dependsOn("${it.fixedPath()}:publishToMavenLocal")
+                    }
+                    dependsOn("updateChangelog")
                 }
 
                 register("publishArtifacts") {
                     group = "release"
+                    //ToDo: dependsOn("publish")
+//                    projectsToRelease().forEach{
+//                        dependsOn("${it.fixedPath()}:publish")
+//                    }
                     logger.lifecycle("Publishing java artifacts")
                 }
 
-
             }
+        }
+    }
+
+    private fun Project.projectsToRelease(): List<Project> {
+        return allprojects.filter { p ->
+            p.plugins.hasPlugin("io.knotx.maven-publish")
+        }
+    }
+
+    private fun Project.fixedPath(): String {
+        return if (path.endsWith(":")) {
+            path
+        } else {
+            "$path:"
         }
     }
 }

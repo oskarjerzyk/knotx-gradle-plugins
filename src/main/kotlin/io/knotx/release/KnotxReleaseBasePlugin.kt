@@ -28,11 +28,11 @@ class KnotxReleaseBasePlugin : Plugin<Project> {
         with(project) {
             tasks {
                 register<ProjectVersionUpdateTask>("setVersion") {
-                    group = "io.knotx.release prepare"
+                    group = "release prepare"
                     versionProperty = "version"
                 }
                 register<ChangelogUpdateTask>("updateChangelog") {
-                    group = "io.knotx.release prepare"
+                    group = "release prepare"
                     versionProperty = "version"
                 }
             }
