@@ -34,7 +34,3 @@ steps:
       testResultsFiles: '**/TEST-*.xml'
       tasks: 'build'
     displayName: "Build Gradle Plugins"
-  - script: |
-      git clone https://github.com/Knotx/knotx-aggregator.git
-      mkdir $(workspaceDir)
-    displayName: "Prepare Aggregator"
