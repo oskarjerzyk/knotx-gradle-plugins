@@ -16,7 +16,7 @@ trigger:
   - master
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'windows-latest'
 
 variables:
   workspaceDir: knotx-repos
